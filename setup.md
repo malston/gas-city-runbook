@@ -6,9 +6,11 @@ Each step says what to expect. If the output differs, check [Troubleshooting](#t
 
 ## Before you start
 
-Run commands one line at a time, at least until step 1 is done. Zsh expands aliases when it reads a pasted block, before any line in that block runs. A multi-line paste that contains `unalias gc` followed by `gc version` will still run the old alias on the second line.
+Run commands one line at a time, at least until step 2 is done. Zsh expands aliases when it reads a pasted block, before any line in that block runs. A multi-line paste that contains `unalias gc` followed by `gc version` will still run the old alias on the second line.
 
 You'll also need Claude Code installed and signed in, since that's the agent this city uses.
+
+The docs in the `gastownhall/gascity` repo track the `main` branch, which runs ahead of the Homebrew release. On the first install, `gc doctor --check` was in the docs but not in 1.4.2. When a flag from the docs fails, `gc <command> --help` shows what your installed version accepts.
 
 ## 1. Install Gas City
 
@@ -106,17 +108,59 @@ cd ~/scratch
 claude
 ```
 
-Pick _Yes, I trust this folder_, then exit with `/exit`. Do this once for every new rig, before you sling work to it.
+Pick _Yes, I trust this folder_, then exit with `/exit`. Do this once for every new rig, before you sling work to it. `--dangerously-skip-permissions` doesn't cover this prompt, since it only skips tool permissions.
 
 ## 6. Check the agents
 
 ```bash
+cd ~/city
 gc agent list
 ```
 
 You should see city agents (`mayor`, `claude`, `codex`, `gemini` and some housekeeping ones) and a set of rig agents qualified by the rig name, such as `scratch/claude` and `scratch/gc.implementation-worker`. The `scratch/gc.*` agents are the roles from the pack you just installed.
 
-## 7. Route a first job
+`claude`, `codex` and `gemini` are implicit agents. Gas City creates one per configured provider, once for the city and once per rig. They don't come from any pack, which matters in the next step.
+
+## 7. Tune the rig's worker before the first job
+
+Left alone, `scratch/claude` launches as `claude --dangerously-skip-permissions --effort max`. That's Opus at maximum effort, carrying your personal Claude Code setup. It loads your `~/.claude` skills, plugins, status lines, `CLAUDE.md` rules and your Git identity. On the first install, a hello world job took about 20 minutes and cost $4.76. It ran bats tests, shellcheck, a mutation check and a code review, because your personal rules told it to. It also committed as you and refused to merge to `main`, again because your rules say so.
+
+Add a patch to the end of `~/city/city.toml`:
+
+```toml
+[[patches.agent]]
+dir = "scratch"
+name = "claude"
+option_defaults = { effort = "medium", model = "sonnet" }
+env = { GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
+```
+
+It has to be a city-level `[[patches.agent]]` with `dir` set to the rig. A rig-level `[[rigs.patches]]` block looks like it should work, but it can only reach agents that came from the rig's packs, and implicit agents don't. It fails with `overrides[0]: agent "claude" not found in pack`. The 1.4.2 source holds back city-level patches aimed at implicit agents until after those agents exist, which is why this form works.
+
+In 1.4.2 the built-in Claude provider defaults to `effort = "max"` and bypass permissions. Valid effort values run from `low` to `max`. `sonnet` maps to `--model claude-sonnet-5`, and `haiku`, `opus` and a few pinned versions are also accepted. The `env` line gives the worker's commits their own author so you can tell them apart from yours in `git log`.
+
+Keep `ready_delay_ms = 0` under each `[providers.*]` table where `gc init` put it. `[workspace]` has no such field, and without it the Claude provider waits 10 seconds before it treats each session as ready.
+
+Validate right after saving:
+
+```bash
+gc config show --validate
+gc doctor | grep -E 'config|✗'
+```
+
+Don't skip this. A `city.toml` that fails to load does more than block new sessions. Running workers call `gc bd` to update their beads, and those calls fail too until the file loads again. On the first install that stalled a worker partway through its job.
+
+To check the patch landed, look at the merged config. `gc config explain` doesn't print `option_defaults` for agents in 1.4.2, so use `show`:
+
+```bash
+gc config show | grep -n -B4 -A3 'option_defaults'
+```
+
+Patches only apply to sessions that start after the change. A worker that's already running keeps its launch flags until it's retired.
+
+A further step, not yet tested, is giving workers their own Claude Code config directory. Claude Code reads `CLAUDE_CONFIG_DIR`, so adding it to the patch's `env` would keep your personal skills and rules out of workers. That directory needs its own login and its own trust answer for each rig (run `CLAUDE_CONFIG_DIR=<dir> claude` once in the rig), and a lean claudeup profile is a natural fit for what goes in it.
+
+## 8. Route a first job
 
 From `~/city`, sling a task to the rig's Claude agent. Use the qualified name.
 
@@ -134,38 +178,68 @@ Dashboard: http://127.0.0.1:8372/city/city/runs/sc-33w
 
 `sc-omn` is the task bead. `sc-33w` is the workflow the agent follows, taken from its default formula `mol-do-work`.
 
-## 8. Watch it work
+To confirm the worker launched with your patched flags, watch for its start command:
+
+```bash
+gc events --follow | grep -o '"command":"claude[^"]*"'
+```
+
+It should show `--effort medium --model claude-sonnet-5`. This only prints new events, so start it before the `sling` or wait for the next session.
+
+## 9. Watch it work
 
 The dashboard link from `sling` is the easiest view. It shows each step of the workflow as it moves from pending to running to closed, and the _Session_ tab shows the agent's live session.
 
-From the terminal, go through `gc bd` so the lookup hits the rig's store:
-
-```bash
-gc bd --rig scratch show sc-33w --watch
-```
-
-Plain `bd show` run from `~/city` looks in the city's own store and reports `no issue found`. Running plain `bd` from inside `~/scratch` also works.
-
-To attach to the agent directly:
+From the terminal:
 
 ```bash
 gc session list
-gc session attach <session-name>
+gc session peek <session-id>
+gc bd --rig scratch show sc-omn
 ```
 
-Detach with `Ctrl-b d` so the session keeps running.
+A healthy worker keeps the same ID with a growing `AGE`. `peek` shows its screen without attaching. `gc bd --rig` reads the rig's store from anywhere, and plain `bd show` from inside `~/scratch` works too. Plain `bd show` from `~/city` looks in the city's store and reports `no issue found`.
 
-When the bead closes, check `ls ~/scratch` for the script and `git -C ~/scratch log` to see whether the agent committed it.
+The bead stays `OPEN` the whole time the worker has it. Gas City records the claim in metadata, and `gc.last_heartbeat_at` shows the worker checking in.
+
+To attach instead of peeking, run `gc session attach <session-id>` and detach with `Ctrl-b d` so the session keeps running.
+
+While a worker is active, stay out of the rig's Git checkout. The default worker has no worktree. It creates a branch named after the bead and checks it out right in `~/scratch`, so switching branches or committing there pulls the branch out from under it. Your shell prompt's own `git status` is harmless, but the worker notices it and says another command ran in the repository.
+
+Don't run the commands you see in `peek` yourself. `gc hook --claim --drain-ack --json` is the worker asking the city for work. In your shell it fails with `agent not specified`, and if you pass it an agent name it will claim beads meant for the worker.
+
+## 10. What the first job leaves behind
+
+When the bead closes, the worker switches the rig back to `main`, and the bead carries structured results in its metadata:
+
+```text
+gc.work_branch: sc-omn/hello-world
+gc.work_commit: 1ceb413...
+gc.work_outcome: shipped
+gc.work_verification: bats hello.bats; shellcheck hello.sh hello.bats; ...
+```
+
+Those fields are what a formula or an order can read later, which is handy for the epic-loop port. Merging is still yours to do, since there's no remote and so no PR:
+
+```bash
+cd ~/scratch
+git log --oneline --all -5
+git merge sc-omn/hello-world
+```
+
+`gc rig add` also leaves files uncommitted in the rig: `.gitignore`, `.beads/metadata.json`, `.beads/identity.toml` and `.gc/`. Read `git diff .gitignore` before committing any of them. `.gc/` is runtime state and belongs in `.gitignore`, not in the repo's history.
 
 ## What to expect on the dashboard
 
-Three things on the first run look odd but are normal.
+A few things on the first run look odd but are normal.
 
 The run header shows `V1`. `mol-do-work` uses the older formula compiler. Formulas you write should declare `formula_compiler = ">=2.0.0"` to get `check`, `retry` and `drain`.
 
-The _Diff_ tab says no diff is available because the run recorded no `work_dir`. The default worker edits the rig directly without a worktree. A port of the epic loop needs to set up per-bead worktrees itself (see `gc worktree`).
+The _Diff_ tab says no diff is available because the run recorded no `work_dir`. That's the missing worktree from step 9. A port of the epic loop needs to set up per-bead worktrees itself (see `gc worktree`).
 
-_Health_ may show a badge. Click it before adding more rigs. One likely cause is Dolt running in embedded mode, which makes Gas City fall back to calling `bd` as a subprocess for every store operation. `bd context` should report `dolt_mode=server` for the faster native store.
+_Health_ may show a badge, and `gc supervisor logs` may show `slow_storage_degraded` traces. Those point at Dolt. A brief `dolt circuit breaker is open` error is also possible. It happened once on the first install and cleared by itself within a minute, since the breaker retries every 5 seconds. `gc beads health` checks the store and tries to recover it, and `gc doctor` covers the rest.
+
+`gc doctor` on a fresh city shows three warnings that need no action for a scratch rig. `formula-requirements` is about bundled pack formulas, not yours. `jsonl-archive` means the event archive has no off-box copy. `rig:<name>:dolt-backup` means the rig's beads have no backup registered, and its hint has the command to fix that for a rig you care about.
 
 ## Stopping and removing
 
@@ -197,8 +271,12 @@ brew untap gastownhall/gascity
 | `bd show` says `no issue found` for an `sc-` bead | Looking in the city store instead of the rig's | `gc bd --rig scratch show <id>` |
 | A rig session sits in `start-pending` or `creating`, and `gc session list` shows a new ID every few seconds | The session dies on startup and the pool keeps replacing it | Run `gc supervisor logs` and look for `session died during startup`. The `last pane output` shows what Claude printed, and the full text is in `~/city/.gc/sessions/<session>/start-stderr.log` |
 | That log shows "Quick safety check: Is this a project you created or one you trust?" | Claude Code hasn't been told to trust the rig folder | Run `claude` once in the rig directory, choose _Yes, I trust this folder_, then `/exit` |
+| `applying rig patches: ... agent "claude" not found in pack` | A `[[rigs.patches]]` block aimed at an implicit agent | Use a city-level `[[patches.agent]]` with `dir` and `name` (step 7) |
+| `unknown flag` for a flag the docs mention | The docs are ahead of your installed version | `gc <command> --help` |
+| `dolt circuit breaker is open: server appears down` | Dolt stopped answering for a moment | Wait a minute, then `gc beads health` from `~/city` |
+| `gc hook: agent not specified` | Running a worker's command in your own shell | Don't. Use `gc session peek` to follow the worker |
 | `zsh: no such file or directory` on a `bd show` line | A literal `<bead-id>` placeholder was pasted, and zsh read `<` as a redirect | Replace it with the real ID from `sling` |
 
 ## Next steps
 
-Tutorials 05 (formulas) and 07 (orders) in `docs/tutorials` of the [gascity repo](https://github.com/gastownhall/gascity) cover what you'll need to port the epic loop. The role prompts under `scratch/gc.*` are worth reading first, since some of them may cover parts of the loop already.
+Tutorials 05 (formulas) and 07 (orders) in `docs/tutorials` of the [gascity repo](https://github.com/gastownhall/gascity) cover what you'll need to port the epic loop. Check out the `v1.4.2` tag (or whatever `gc version` says) before reading them, so the examples match your binary. The role prompts under `scratch/gc.*` are worth reading first, since some of them may cover parts of the loop already.
