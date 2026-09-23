@@ -97,7 +97,7 @@ git status -sb
 
 `git status -sb` should print only `## main...origin/main`. `git ls-files -v` marks the four files with `S`.
 
-gc writes the top-level `.gitignore` only during `rig add` and `init`, and never writes `.beads/.gitignore`, so a city restart doesn't undo this. It does rewrite `metadata.json` and `config.yaml` on start, which `--skip-worktree` hides.
+gc's own code writes the top-level `.gitignore` only during `rig add` and `init` (`cmd/gc/cmd_rig.go`, `cmd/gc/cmd_init.go`), and it doesn't write `.beads/.gitignore`. bd does append to `.beads/.gitignore` (its "Added by bd (missing required patterns)" block), but an append leaves the `identity.toml` line in place. gc does write `metadata.json` and `config.yaml` itself when it sets up the store, and `--skip-worktree` hides any later rewrite of those too.
 
 The cost of `--skip-worktree` is on pulls. If a commit on GitHub changes one of those four files, `git pull` in the clone refuses to overwrite it. Then run `git update-index --no-skip-worktree <file>`, move your copy aside, pull, put the gc lines back, and mark it again.
 
@@ -134,8 +134,13 @@ Add a patch to the end of `~/city/city.toml`, the same shape as runbook step 7 w
 dir = "coderay"
 name = "claude"
 option_defaults = { effort = "medium", model = "sonnet" }
+max_active_sessions = 1
 env = { GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
 ```
+
+`max_active_sessions = 1` caps the rig at one Claude worker. Every worker here shares the one checkout (step 9 explains why), so two at once would commit over each other.
+
+`gc-worker@localhost` links the commits to no GitHub account once they're in a PR. If you want them linked to you, use your GitHub noreply address as the email and keep the worker name so they stay easy to spot.
 
 Validate and check it landed:
 
@@ -146,7 +151,15 @@ gc doctor | grep -E '✗|coderay'
 gc config show | awk '/^\[\[agent\]\]/ { if (b ~ /name = "claude"\ndir = "coderay"/) printf "%s", b; b = "" } { b = b $0 "\n" }'
 ```
 
-`gc config show --validate` ends with `Config valid.` It also prints two warnings about `core.control-dispatcher` and `max_active_sessions=1`, which come from the bundled pack and need no action. `gc doctor` should show every `rig:coderay` check passing except `rig:coderay:dolt-backup`, a warning that the `cr` store has no backup registered. The merged `claude` agent for `coderay` should show the `[agent.env]` lines and `effort = "medium"`, `model = "sonnet"`.
+`gc config show --validate` ends with `Config valid.` It also prints two warnings about `core.control-dispatcher` and `max_active_sessions=1`, which come from the bundled pack and need no action. `gc doctor` should show every `rig:coderay` check passing except `rig:coderay:dolt-backup`, a warning that the `cr` store has no backup registered. The merged `claude` agent for `coderay` should show `max_active_sessions = 1`, the `[agent.env]` lines and `effort = "medium"`, `model = "sonnet"`.
+
+Check that workers won't bill your API key. Sessions start from the supervisor's environment, and gc answers Claude's "use this API key?" prompt with Yes on its own (`internal/runtime/dialog.go`). So if `ANTHROPIC_API_KEY` reaches the supervisor, workers run on API billing, not your plan. `env_remove` in a patch doesn't help here. It only removes keys from the agent's own `env` table (`internal/config/patch.go`).
+
+```bash
+ps eww -p "$(pgrep -f 'gc supervisor' | head -1)" | grep -q 'ANTHROPIC_API_KEY=' && echo "supervisor HAS the key" || echo "supervisor: no key"
+```
+
+When this was written it printed `supervisor: no key`, even though `launchctl getenv ANTHROPIC_API_KEY` was set. If it ever prints `HAS the key`, find where the supervisor picks it up before you sling work.
 
 ## 8. Give workers their own Claude config and trust the clone (not yet run)
 
@@ -173,23 +186,34 @@ cd ~/city
 gc sling coderay/claude "Describe one small coderay task here"
 ```
 
-Expect a `cr-` bead and a `mol-do-work` workflow, then watch it as in runbook step 9, with `gc bd --rig coderay show <cr-id>`. Stay out of the clone's checkout while a worker has it. The worker switches branches right there.
+Expect a `cr-` bead and a `mol-do-work` workflow, then watch it as in runbook step 9, with `gc bd --rig coderay show <cr-id>`. Stay out of the clone's checkout while a worker has it.
 
-Don't sling `mol-polecat-commit` at this rig. It works in a worktree off `origin/main`, then runs `git push origin HEAD:main`, which pushes straight to `main` with no PR.
+`mol-do-work` is the default formula, and its own description says "No git branching, no worktree isolation." The worker does the work "in the current working directory," commits, and closes the bead. It has no push step. In this clone that means the commit lands on `main`. On scratch the worker made a branch only because your personal rules told it to.
 
-## 10. Get the work to GitHub
+Don't sling `mol-polecat-commit` at this rig either. It works in a worktree off `origin/main`, then runs `git push origin HEAD:main`, which pushes straight to `main` with no PR.
 
-When the bead closes, the branch is in the clone and nothing has been pushed. Review it, then push and open the PR yourself:
+## 10. Get the work to GitHub (branch move verified)
+
+When the bead closes, the worker's commit sits on the clone's `main`, ahead of `origin/main`, and nothing has been pushed. Move it to a branch, put `main` back, then push and open the PR yourself:
 
 ```bash
 cd ~/gc-rigs/coderay
-git log --oneline main..<branch>
+git status -sb
+git log --oneline origin/main..main
+git branch cr-xxx
+git reset --keep origin/main
+git switch cr-xxx
 make test
-git push -u origin <branch>
-gh pr create --head <branch>
+git push -u origin cr-xxx
+gh pr create
+git switch main
 ```
 
-The four `--skip-worktree` files never go with it. Commits show `Gas City worker` as the author.
+Use the bead ID as the branch name. `git status -sb` should show `[ahead 1]` (or more) before the move and `## main...origin/main` after the reset. This was checked with a throwaway commit: `--keep` put `main` back without touching the four `--skip-worktree` files or the `cr` config.
+
+Those four files never go into the PR. Commits show `Gas City worker` as the author.
+
+Do this before slinging the next bead. The next worker starts from whatever `main` is in the clone.
 
 Don't run `bd sync` or `bd dolt push` in the clone. `bd init` set `sync.remote` in `.beads/config.yaml` to `git+https://github.com/malston/coderay.git`, and `bd sync` pushes to that Dolt remote. The `cr` store would land on GitHub next to the code. GitHub had no `refs/dolt/*` refs when this was written (`git ls-remote origin 'refs/dolt/*'` printed nothing).
 
@@ -209,6 +233,7 @@ This removes the `[[rigs]]` entry and the rig's path binding. It doesn't remove 
 | `.beads already contains a beads store; use --adopt ...`                     | The clone still has `metadata.json` or `config.yaml` in `.beads/`    | Step 2                                              |
 | `--adopt requires a valid issue_prefix in .beads/config.yaml`                | Tried `--adopt` on coderay's committed store                         | Don't adopt. Use steps 2 and 3                      |
 | Clone shows `[ahead 1]` after `rig add`                                      | `bd init` committed on `main`                                        | Step 4                                              |
+| Clone shows `[ahead 1]` after a bead closes                                  | `mol-do-work` commits on the checked-out branch                      | Step 10                                             |
 | `git status` shows `.beads/identity.toml`                                    | The `!.beads/identity.toml` line in `.gitignore` un-ignores it       | Add `identity.toml` to `.beads/.gitignore` (step 4) |
 | `git pull` in the clone refuses to overwrite `.gitignore` or a `.beads` file | Upstream changed a `--skip-worktree` file                            | See the end of step 4                               |
 | `bd show coderay-xxx` fails in the clone                                     | The clone's store is `cr`. `coderay-` beads live in `~/code/coderay` | Run it in `~/code/coderay`                          |
