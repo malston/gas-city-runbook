@@ -225,6 +225,38 @@ If you skip the separate config for now, still trust the folder with plain `clau
 
 coderay's own `CLAUDE.md` and `.claude/settings.json` come with the clone, so workers get the project's rules either way. The settings run `bd prime --hook-json` at session start. `bd` in the clone reads the clone's `cr` store, not your `coderay-` beads: `bd list` there printed `No issues found.` right after step 3.
 
+### Keep workers out of your shared Python (verified)
+
+coderay's `CLAUDE.md` gives `pip install -e .` as the raw install command. On the first job the worker ran exactly that in the clone. Plain `pip` on its `PATH` was the shared mise Python 3.14.2, not the clone's `.venv`. That interpreter already had an editable `crawl` pointing at `~/code/coderay`, and the worker's install switched it to `~/gc-rigs/coderay`. A Claude session in `~/code/coderay` running plain `pytest` then tested the clone's code. Only `make` and `uv run` use the clone's `.venv`.
+
+Give workers a rule of their own in `~/.claude-gc-worker/CLAUDE.md`:
+
+```markdown
+# Gas City worker rules
+
+You share this machine's Python with other sessions. Never install packages into it.
+
+- Never run `pip`, `pip3`, `pip install` or `python -m pip`. Plain `python` and `pip` here are a shared interpreter, and an install changes it for every other session.
+- In a repo with a `Makefile`, run tests with `make test`. Otherwise use `uv run pytest`. Both use the repo's own `.venv`.
+- If the repo's `.venv` is missing or out of date, run `make install` (or `uv sync --locked`). Never install anything outside the repo.
+- If a repo's own docs tell you to run `pip install -e .`, use `make install` instead.
+```
+
+Check that the worker config loads it (one Haiku call):
+
+```bash
+cd ~/gc-rigs/coderay
+CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude -p --model haiku "Without running any tools: what does your user-level instructions file say about pip? Quote its first bullet exactly."
+```
+
+It should quote the first bullet. This is an instruction, not a lock, so a worker can still ignore it. To see whether it did, check which checkout the shared install points at:
+
+```bash
+~/.local/share/mise/installs/python/3.14.2/bin/pip show crawl | grep 'Editable project location'
+```
+
+It should say `/Users/markalston/code/coderay`. If it says `gc-rigs`, run `pip install -e .` from `~/code/coderay` with that same `pip`.
+
 ## 9. Route a first job (not yet run)
 
 Pick something small and self-contained, then sling it from `~/city` with your own description in the quotes:
