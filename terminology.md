@@ -1,6 +1,6 @@
-# Artifacts
+# Terminology
 
-[How the pieces of Gas City connect](https://claude.ai/artifact/CgB3DQN2Fry97nYC4q87t8)
+[How the pieces of Gas City connect](./connect-the-dots.html)
 
 First, a correction to something I told you earlier. While checking terms I found that 1.4.2 has no `gc worktree` command. The Gas Town command map says worktrees come from config and scripts: an agent's `work_dir` plus a `pre_start` command that runs `git worktree add`. I've fixed the runbook and the Worktrees station on the map.
 
