@@ -101,6 +101,29 @@ gc's own code writes the top-level `.gitignore` only during `rig add` and `init`
 
 The cost of `--skip-worktree` is on pulls. If a commit on GitHub changes one of those four files, `git pull` in the clone refuses to overwrite it. Then run `git update-index --no-skip-worktree <file>`, move your copy aside, pull, put the gc lines back, and mark it again.
 
+### Remove the store's Dolt remote (verified)
+
+`bd init` also gives the `cr` store a Dolt remote named `origin`, pointing at `git+https://github.com/malston/coderay.git`, and writes the same URL to `sync.remote` in `.beads/config.yaml`. Leave them and bd pushes the store to GitHub on its own. On the first job, about a minute after `gc sling`, GitHub gained `refs/dolt/data` and a `__dolt_remote_info__` branch holding the six `cr-` beads, pushed under your Git identity, with no push command in the worker's transcript. bd's help mentions the feature only as "`--sandbox`: disables Dolt auto-push".
+
+Remove both:
+
+```bash
+cd ~/gc-rigs/coderay
+bd dolt remote remove origin
+perl -0pi -e 's/\nsync:\n\s+remote: "[^"]*"\n?/\n/' .beads/config.yaml
+bd dolt remote list
+bd config get sync.remote
+```
+
+Expect `No remotes configured.` and `sync.remote (not set in config.yaml)`. `bd config unset sync.remote` isn't enough: it reports success, but `bd init` wrote the value as a nested `sync:` block, and that block stays.
+
+If a push already happened, delete it from GitHub:
+
+```bash
+git ls-remote origin 'refs/dolt/*' 'refs/heads/__dolt_remote_info__'
+git push origin --delete refs/dolt/data refs/heads/__dolt_remote_info__
+```
+
 ## 5. Install the rig's packs (verified)
 
 ```bash
@@ -255,7 +278,7 @@ Those four files never go into the PR. Commits show `Gas City worker` as the aut
 
 Do this before slinging the next bead. The next worker starts from whatever `main` is in the clone.
 
-Don't run `bd sync` or `bd dolt push` in the clone. `bd init` set `sync.remote` in `.beads/config.yaml` to `git+https://github.com/malston/coderay.git`, and `bd sync` pushes to that Dolt remote. The `cr` store would land on GitHub next to the code. GitHub had no `refs/dolt/*` refs when this was written (`git ls-remote origin 'refs/dolt/*'` printed nothing).
+If GitHub shows a `__dolt_remote_info__` branch with a "Compare & pull request" banner, the store's Dolt remote is back. Redo "Remove the store's Dolt remote" in step 4.
 
 ## Removing the rig
 
