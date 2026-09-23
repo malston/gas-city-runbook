@@ -213,6 +213,21 @@ gc sling coderay/claude "Describe one small coderay task here"
 
 Expect a `cr-` bead and a `mol-do-work` workflow, then watch it as in runbook step 9, with `gc bd --rig coderay show <cr-id>`. Stay out of the clone's checkout while a worker has it.
 
+The sling text becomes the bead's title only. Its description is `(none)`, and the worker can't read your `coderay-` beads. To hand over one of those beads in full, copy its description into the new `cr-` bead right after the sling:
+
+```bash
+cd ~/code/coderay
+bd show coderay-xxx --json | python3 -c "import json,sys; d=json.load(sys.stdin); d=d[0] if isinstance(d,list) else d; print(d['description'])" > /tmp/desc.txt
+cd ~/city
+gc bd --rig coderay update cr-yyy --body-file /tmp/desc.txt
+```
+
+Do it quickly. The worker reads the bead soon after its session starts. On the first job, the session started within seconds of the update.
+
+`gc events` lists the launch command once per `bead.updated` event on the worker's session bead, so the watcher prints the same line several times for one worker. `gc session list` shows whether it's really one session.
+
+Claude Code may show a "Try the new fullscreen renderer?" prompt inside the worker. On the first job it sat there for the whole run, and the worker kept calling tools underneath it.
+
 `mol-do-work` is the default formula, and its own description says "No git branching, no worktree isolation." The worker does the work "in the current working directory," commits, and closes the bead. It has no push step. In this clone that means the commit lands on `main`. On scratch the worker made a branch only because your personal rules told it to.
 
 Don't sling `mol-polecat-commit` at this rig either. It works in a worktree off `origin/main`, then runs `git push origin HEAD:main`, which pushes straight to `main` with no PR.
