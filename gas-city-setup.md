@@ -158,7 +158,44 @@ gc config show | grep -n -B4 -A3 'option_defaults'
 
 Patches only apply to sessions that start after the change. A worker that's already running keeps its launch flags until it's retired.
 
-A further step, not yet tested, is giving workers their own Claude Code config directory. Claude Code reads `CLAUDE_CONFIG_DIR`, so adding it to the patch's `env` would keep your personal skills and rules out of workers. That directory needs its own login and its own trust answer for each rig (run `CLAUDE_CONFIG_DIR=<dir> claude` once in the rig), and a lean claudeup profile is a natural fit for what goes in it.
+### Give workers their own Claude config
+
+The patch above changes the model and effort, but the worker still loads your personal `~/.claude`. That includes your user-level `CLAUDE.md` rules, skills, plugins, status lines and MCP servers. Claude Code reads its config from whatever directory `CLAUDE_CONFIG_DIR` points to, so giving workers a separate one keeps your setup out of them. Their behavior then comes from Gas City and the rig, which is what you want to see before you build on it.
+
+Gas City's own pieces don't live in that directory, so they keep working. In 1.4.2 it passes its hooks through `--settings ~/city/.gc/settings.json` on the launch command, and it installs pack skills into the rig's own `.claude/skills` folder.
+
+Create the directory and set it up once by hand. A fresh Claude config has none of the answers a worker can't give on its own, and each unanswered prompt kills the session the same way the trust prompt did in step 5.
+
+```bash
+mkdir -p ~/.claude-gc-worker
+cd ~/scratch
+CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions
+```
+
+Answer everything it asks, which on a fresh directory can include a theme choice, a login, the folder trust prompt and a warning about bypass permissions mode. Log in with the same account you use now. Then type `/exit`. For every rig you add later, run the same `claude` command once in that rig so the new config trusts it too.
+
+If you want workers to follow a few rules of their own, put a short `CLAUDE.md` in `~/.claude-gc-worker`. Keep it small. It applies to every worker that uses this directory. A lean claudeup profile is another way to manage what goes in there.
+
+Add the directory to the agent patch's `env`. Use the full path, since Gas City passes the value as written and `~` won't expand:
+
+```toml
+[[patches.agent]]
+dir = "scratch"
+name = "claude"
+option_defaults = { effort = "medium", model = "sonnet" }
+env = { CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc-worker", GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
+```
+
+Claude Code also writes session transcripts under the config directory, and `gc session logs` only looks in `~/.claude/projects/` by default. Add the new location near the top of `city.toml` so `gc session logs` still finds worker transcripts:
+
+```toml
+[daemon]
+observe_paths = ["/Users/markalston/.claude-gc-worker/projects"]
+```
+
+Validate again with `gc config show --validate`. The change applies to the next worker session, not one that's already running.
+
+The quickest check is `gc session peek` on the next worker. The status area at the bottom should no longer show your personal status lines (the token-ledger, context-lens and quota-meter lines). `ls ~/.claude-gc-worker/projects` should also gain an entry for the rig once the worker has run. If the session loops in `start-pending` instead, check `start-stderr.log` as in the troubleshooting table. The most likely cause is a first-run prompt the manual setup didn't answer.
 
 ## 8. Route a first job
 
@@ -177,6 +214,35 @@ Dashboard: http://127.0.0.1:8372/city/city/runs/sc-33w
 ```
 
 `sc-omn` is the task bead. `sc-33w` is the workflow the agent follows, taken from its default formula `mol-do-work`.
+
+### Or hand it to the mayor
+
+The Gas City README takes a different route. You create the bead yourself and let the mayor decide who works on it. That's closer to how a city is meant to run day to day. Slinging straight to `scratch/claude` is more predictable when you're testing one worker, which is why this runbook uses it first.
+
+Create the bead from inside the rig, so it lands in the rig's store with an `sc-` ID:
+
+```bash
+cd ~/scratch
+bd create "Create a script that prints hello world"
+```
+
+A bead made this way just sits in the store. Nothing routes it until someone slings it. Attach to the mayor and ask it to take care of the bead:
+
+```bash
+cd ~/city
+gc session attach mayor
+```
+
+Tell it something like "Route sc-xxx to a worker in the scratch rig," using the ID `bd create` printed. The mayor ships with a skill for planning, creating beads and starting workflows, so it slings the bead for you. Detach with `Ctrl-b d` and watch the work the same way as in step 9.
+
+You can also skip the mayor and route an existing bead yourself. `gc sling` accepts a bead ID as well as plain text:
+
+```bash
+cd ~/city
+gc sling scratch/claude sc-xxx
+```
+
+The README also runs `gc start` right after `gc init`. In 1.4.2 `gc init` already registers and starts the city unless you pass `--no-start`, so the extra `gc start` is harmless but only needed when `init` stopped early, as it does without a Dolt identity.
 
 To confirm the worker launched with your patched flags, watch for its start command:
 
@@ -235,7 +301,7 @@ A few things on the first run look odd but are normal.
 
 The run header shows `V1`. `mol-do-work` uses the older formula compiler. Formulas you write should declare `formula_compiler = ">=2.0.0"` to get `check`, `retry` and `drain`.
 
-The _Diff_ tab says no diff is available because the run recorded no `work_dir`. That's the missing worktree from step 9. A port of the epic loop needs to set up per-bead worktrees itself (see `gc worktree`).
+The _Diff_ tab says no diff is available because the run recorded no `work_dir`. That's the missing worktree from step 9. A port of the epic loop needs to set up per-bead worktrees itself. In 1.4.2 there's no `gc worktree` command for that. It's config and script wiring: an agent's `work_dir` plus a `pre_start` script that runs `git worktree add`.
 
 _Health_ may show a badge, and `gc supervisor logs` may show `slow_storage_degraded` traces. Those point at Dolt. A brief `dolt circuit breaker is open` error is also possible. It happened once on the first install and cleared by itself within a minute, since the breaker retries every 5 seconds. `gc beads health` checks the store and tries to recover it, and `gc doctor` covers the rest.
 
@@ -271,6 +337,8 @@ brew untap gastownhall/gascity
 | `bd show` says `no issue found` for an `sc-` bead | Looking in the city store instead of the rig's | `gc bd --rig scratch show <id>` |
 | A rig session sits in `start-pending` or `creating`, and `gc session list` shows a new ID every few seconds | The session dies on startup and the pool keeps replacing it | Run `gc supervisor logs` and look for `session died during startup`. The `last pane output` shows what Claude printed, and the full text is in `~/city/.gc/sessions/<session>/start-stderr.log` |
 | That log shows "Quick safety check: Is this a project you created or one you trust?" | Claude Code hasn't been told to trust the rig folder | Run `claude` once in the rig directory, choose _Yes, I trust this folder_, then `/exit` |
+| Workers loop again right after adding `CLAUDE_CONFIG_DIR` | The new config directory hasn't answered a first-run prompt (login, trust or the bypass-permissions warning) for this rig | Run `CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions` in the rig, answer the prompts, then `/exit` |
+| `gc session logs` finds nothing for a worker | Its transcripts are under the worker config directory | Add `<dir>/projects` to `[daemon] observe_paths` |
 | `applying rig patches: ... agent "claude" not found in pack` | A `[[rigs.patches]]` block aimed at an implicit agent | Use a city-level `[[patches.agent]]` with `dir` and `name` (step 7) |
 | `unknown flag` for a flag the docs mention | The docs are ahead of your installed version | `gc <command> --help` |
 | `dolt circuit breaker is open: server appears down` | Dolt stopped answering for a moment | Wait a minute, then `gc beads health` from `~/city` |

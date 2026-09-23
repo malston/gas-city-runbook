@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>How the pieces of Gas City connect</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&family=Overpass+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  --bg: #E6EAEE;
+  --zone: #F4F6F8;
+  --zone-edge: #C9D1D8;
+  --ink: #1B2630;
+  --muted: #56646F;
+  --station: #FFFFFF;
+  --panel: #F9FAFB;
+  --work: #C98500;
+  --control: #0F7C74;
+  --config: #2D63A8;
+  --store: #74479C;
+  --claude: #B8456E;
+  --events: #66737D;
+  --focus: #2D63A8;
+  --font: "Overpass", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mono: "Overpass Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12181D;
+    --zone: #1A2229;
+    --zone-edge: #2C3740;
+    --ink: #E4E9ED;
+    --muted: #97A5B0;
+    --station: #12181D;
+    --panel: #171F25;
+    --work: #F0AE2A;
+    --control: #2BB3A7;
+    --config: #5B93DB;
+    --store: #A77FD4;
+    --claude: #E0759A;
+    --events: #8C98A2;
+    --focus: #5B93DB;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12181D;
+  --zone: #1A2229;
+  --zone-edge: #2C3740;
+  --ink: #E4E9ED;
+  --muted: #97A5B0;
+  --station: #12181D;
+  --panel: #171F25;
+  --work: #F0AE2A;
+  --control: #2BB3A7;
+  --config: #5B93DB;
+  --store: #A77FD4;
+  --claude: #E0759A;
+  --events: #8C98A2;
+  --focus: #5B93DB;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 1.75rem 1.25rem 3rem;
+}
+header h1 {
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0 0 0.5rem;
+  max-width: 30ch;
+}
+header p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 62ch;
+}
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  align-items: center;
+  margin: 1.5rem 0 1rem;
+}
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.legend button, .modebtn, .stepnav button {
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--ink);
+  background: var(--zone);
+  border: 1.5px solid var(--zone-edge);
+  border-radius: 999px;
+  padding: 0.3rem 0.8rem 0.2rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+.legend button .swatch {
+  width: 22px;
+  height: 6px;
+  border-radius: 3px;
+  display: inline-block;
+}
+.legend button[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+.legend button.planned .swatch {
+  background: repeating-linear-gradient(90deg, var(--muted) 0 5px, transparent 5px 9px);
+}
+.modebtn {
+  font-weight: 600;
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
+button:focus-visible, .station:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1.25rem;
+  align-items: start;
+}
+@media (max-width: 1080px) {
+  .layout { grid-template-columns: minmax(0, 1fr); }
+}
+.mapbox {
+  overflow-x: auto;
+  border-radius: 14px;
+  background: var(--zone);
+  border: 1.5px solid var(--zone-edge);
+}
+.mapbox svg {
+  display: block;
+  width: 100%;
+  min-width: 720px;
+  height: auto;
+}
+.zone rect { fill: var(--bg); stroke: var(--zone-edge); stroke-width: 1.5; }
+.zone text { fill: var(--muted); font-size: 13px; font-family: var(--mono); }
+.edge {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: opacity 0.2s;
+}
+.edge.planned { stroke-dasharray: 2 10; stroke-width: 5; }
+.station { cursor: pointer; outline: none; transition: opacity 0.2s; }
+.station circle.dot { fill: var(--station); stroke: var(--ink); stroke-width: 3.5; }
+.station.dashed circle.dot { stroke-dasharray: 4 3; stroke: var(--muted); }
+.station circle.ring { fill: none; stroke: var(--focus); stroke-width: 3; opacity: 0; }
+.station.selected circle.ring { opacity: 1; }
+.station text {
+  fill: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.station:hover circle.dot { stroke-width: 5; }
+.dim { opacity: 0.14; }
+.panel {
+  background: var(--panel);
+  border: 1.5px solid var(--zone-edge);
+  border-radius: 14px;
+  padding: 1.25rem 1.25rem 1.1rem;
+  min-height: 320px;
+}
+.panel h2 {
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 0.6rem;
+}
+.panel p { margin: 0 0 0.9rem; }
+.panel h3 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 1rem 0 0.35rem;
+}
+.panel code, .panel pre {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+}
+.panel p code {
+  background: var(--bg);
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+}
+.panel ul.cmds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.panel ul.cmds li {
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  background: var(--bg);
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem 0.2rem;
+  margin-bottom: 0.3rem;
+  overflow-x: auto;
+  white-space: pre;
+}
+.panel .note {
+  border-left: 4px solid var(--work);
+  padding: 0.1rem 0 0.1rem 0.75rem;
+  margin: 0;
+}
+.panel .routes { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.8rem; }
+.panel .routes span {
+  font-size: 0.8rem;
+  border-radius: 999px;
+  padding: 0.12rem 0.6rem 0.02rem;
+  color: #fff;
+}
+.stepnav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+.stepnav button:disabled { opacity: 0.4; cursor: default; }
+.stepnav .count { color: var(--muted); font-size: 0.9rem; margin-left: auto; }
+ol.steps {
+  margin: 0.3rem 0 0;
+  padding-left: 1.3rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+ol.steps li { margin-bottom: 0.15rem; cursor: pointer; }
+ol.steps li.current { color: var(--ink); font-weight: 600; }
+.hint { color: var(--muted); font-size: 0.9rem; margin-top: 0.75rem; }
+@media (prefers-reduced-motion: reduce) {
+  .edge, .station { transition: none; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>How the pieces of Gas City connect</h1>
+    <p>A transit-style map of one city with one rig, drawn from a Gas City 1.4.2 install. Pick a station to see what it does, pick a line to follow it, or trace a job from sling to close.</p>
+  </header>
+
+  <div class="controls">
+    <button class="modebtn" id="modeBtn" type="button">Trace a job</button>
+    <div class="legend" id="legend" role="group" aria-label="Lines"></div>
+  </div>
+
+  <div class="layout">
+    <div class="mapbox">
+      <svg id="map" viewBox="0 0 1000 690" role="group" aria-label="Map of Gas City components"></svg>
+    </div>
+    <aside class="panel" id="panel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var ROUTES = {
+    work:    { name: "Work",          color: "--work" },
+    control: { name: "Control",       color: "--control" },
+    config:  { name: "Config",        color: "--config" },
+    store:   { name: "Beads",         color: "--store" },
+    claude:  { name: "Claude config", color: "--claude" },
+    events:  { name: "Events",        color: "--events" },
+    planned: { name: "Not used yet",  color: "--muted" }
+  };
+  var ROUTE_OFFSET = { work: 0, control: -5, config: 0, store: 5, claude: 0, events: 0, planned: 0 };
+
+  var ZONES = [
+    { x: 20,  y: 40,  w: 175, h: 630, label: "outside the city" },
+    { x: 215, y: 40,  w: 435, h: 440, label: "~/city" },
+    { x: 215, y: 495, w: 435, h: 175, label: "bead stores" },
+    { x: 670, y: 40,  w: 310, h: 630, label: "~/scratch (rig)" }
+  ];
+
+  var NODES = {
+    you: {
+      x: 105, y: 110, lx: 122, ly: 115, anchor: "start", name: "You",
+      what: "Your terminal. gc drives the city and bd reads or writes beads directly.",
+      where: "Any shell, though most gc commands expect to run from ~/city.",
+      cmds: ["gc sling scratch/claude \"...\"", "gc session peek <id>", "gc bd --rig scratch show <id>"],
+      note: "gc finds the city by walking up from the current directory. Commands run from ~/scratch fail with \u201cnot in a city directory\u201d."
+    },
+    claudecfg: {
+      x: 105, y: 450, lx: 122, ly: 455, anchor: "start", name: "Claude config",
+      what: "Where Claude Code reads your user settings, skills, plugins, CLAUDE.md rules and folder trust.",
+      where: "~/.claude by default, or whatever CLAUDE_CONFIG_DIR points to.",
+      cmds: ["CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions"],
+      note: "Workers load your personal setup unless the agent patch sets CLAUDE_CONFIG_DIR. On the first install that meant bats tests, a mutation check and a code review for a two-line script."
+    },
+    supervisor: {
+      x: 290, y: 110, lx: 290, ly: 138, anchor: "middle", name: "Supervisor",
+      what: "The long-running process that owns the city. It runs the controller, the API and the Dolt server.",
+      where: "Registered with launchd at ~/Library/LaunchAgents/com.gascity.supervisor.plist, so it comes back at login.",
+      cmds: ["gc start", "gc stop ~/city", "gc supervisor logs", "gc service restart"],
+      note: "gc stop also unregisters the city. Run gc register to bring it back."
+    },
+    controller: {
+      x: 430, y: 110, lx: 430, ly: 138, anchor: "middle", name: "Controller",
+      what: "The reconciler loop inside the supervisor. Every tick it compares what should exist (config, pool demand, due orders) with what's running and closes the gap.",
+      where: "Inside the supervisor. Its decisions show up in gc supervisor logs as poolDesired and scaleCheck lines.",
+      cmds: ["gc status", "gc doctor", "gc supervisor logs"],
+      note: "A crash loop shows here as a new session every few seconds, each one ending in failed-create."
+    },
+    api: {
+      x: 570, y: 110, lx: 570, ly: 138, anchor: "middle", name: "Dashboard",
+      what: "The supervisor's HTTP API and the web dashboard on top of it: runs, beads, agents, mail, activity and health.",
+      where: "http://127.0.0.1:8372",
+      cmds: ["open http://127.0.0.1:8372"],
+      note: "The run page's Diff tab stays empty for mol-do-work because the run records no work_dir."
+    },
+    config: {
+      x: 290, y: 220, lx: 290, ly: 248, anchor: "middle", name: "city.toml",
+      what: "The city's config: the workspace provider, provider settings, rigs, imports, agent patches and daemon settings.",
+      where: "~/city/city.toml. Rig paths live separately in ~/city/.gc/site.toml.",
+      cmds: ["gc config show --validate", "gc config show", "gc doctor | grep -E 'config|\u2717'"],
+      note: "A file that fails to load also breaks bead updates for workers that are already running. Validate right after every save."
+    },
+    packs: {
+      x: 430, y: 220, lx: 430, ly: 200, anchor: "middle", name: "Packs",
+      what: "Bundles of agents, formulas, orders, prompts and skills. A city imports them locally or from Git.",
+      where: "Pinned in packs.lock and cached under ~/.gc/cache/repos.",
+      cmds: ["gc import install", "gc agent list"],
+      note: "gc rig add imports the gascity/roles pack. Run gc import install before anything else touches the rig."
+    },
+    providers: {
+      x: 570, y: 220, lx: 570, ly: 248, anchor: "middle", name: "Providers",
+      what: "How to launch each coding agent: the command, its flags and option defaults such as model and effort.",
+      where: "[providers.claude] in city.toml, built on builtin:claude.",
+      cmds: ["gc config show | grep -n -B4 -A3 option_defaults"],
+      note: "The built-in Claude provider defaults to Opus at effort max with bypass permissions. Keep ready_delay_ms = 0 under each provider table."
+    },
+    formulas: {
+      x: 290, y: 330, lx: 290, ly: 312, anchor: "middle", name: "Formulas",
+      what: "Reusable templates for a unit of work. Slinging one pours a workflow, which is a graph of beads with steps and dependencies.",
+      where: "In packs, under formulas/.",
+      cmds: ["gc sling <agent> <formula> --formula"],
+      note: "A plain-text sling wraps the task in the agent's default formula, mol-do-work. It's a v1 formula. Write yours with formula_compiler = \">=2.0.0\" to get check, retry and drain."
+    },
+    agents: {
+      x: 430, y: 330, lx: 430, ly: 358, anchor: "middle", name: "Agent pools",
+      what: "The roles that do work. Pack agents, plus one implicit agent per provider for the city and for each rig. A pool scales sessions to match claimable work.",
+      where: "Defined by packs and by the providers in city.toml.",
+      cmds: ["gc agent list"],
+      note: "Implicit agents like scratch/claude need a city-level [[patches.agent]] with dir = \"scratch\". A rig-level patch fails with \u201cagent not found in pack\u201d."
+    },
+    orders: {
+      x: 290, y: 430, lx: 290, ly: 458, anchor: "middle", name: "Orders",
+      what: "Triggers that fire a formula on a cron schedule, a cooldown, an event or a condition. The controller checks them every tick.",
+      where: "In packs, under orders/.",
+      cmds: ["gc events --follow | grep order"],
+      note: "Built-in orders like nudge-on-route and beads-health show up in the event stream from the start."
+    },
+    events: {
+      x: 430, y: 430, lx: 430, ly: 458, anchor: "middle", name: "Event log",
+      what: "An append-only record of every bead change, session transition and order firing.",
+      where: "~/city/.gc/events.jsonl",
+      cmds: ["gc events --follow", "gc events --follow | grep -o '\"command\":\"claude[^\"]*\"'"],
+      note: "The quickest way to see the exact command a session was launched with."
+    },
+    citystore: {
+      x: 300, y: 600, lx: 300, ly: 628, anchor: "middle", name: "City store",
+      what: "Beads that belong to the city itself: session records, order tracking, mail and control-plane records. IDs start with ci-.",
+      where: "A database on the city's Dolt server.",
+      cmds: ["cd ~/city && bd show <ci-id>"],
+      note: "Session records live here, so gc session peek fails for a moment if Dolt stops answering."
+    },
+    dolt: {
+      x: 440, y: 600, lx: 440, ly: 628, anchor: "middle", name: "Dolt server",
+      what: "The Git-versioned SQL database behind every bead store. One server for the city, one database per scope.",
+      where: "Started by the supervisor on a local port.",
+      cmds: ["gc dolt status", "gc beads health"],
+      note: "Needs a Dolt author identity before gc init. A brief \u201ccircuit breaker is open\u201d error cleared on its own."
+    },
+    rigstore: {
+      x: 570, y: 600, lx: 570, ly: 628, anchor: "middle", name: "Rig store",
+      what: "Beads for one rig: tasks, workflows and convoys. IDs carry the rig's prefix, sc- for scratch.",
+      where: "A database on the same Dolt server, one per rig.",
+      cmds: ["gc bd --rig scratch show <sc-id>", "cd ~/scratch && bd show <sc-id>"],
+      note: "Plain bd run from ~/city looks in the city store and reports \u201cno issue found\u201d for sc- beads."
+    },
+    sessions: {
+      x: 825, y: 330, lx: 840, ly: 312, anchor: "start", name: "Sessions",
+      what: "Running agent processes, one tmux pane each. States go start-pending, creating, active, then closed or failed-create.",
+      where: "tmux panes working in the rig directory.",
+      cmds: ["gc session list", "gc session peek <id>", "gc session attach <id>"],
+      note: "Claude's folder-trust prompt killed every new pane until it was answered once by hand in ~/scratch."
+    },
+    repo: {
+      x: 825, y: 440, lx: 840, ly: 445, anchor: "start", name: "Rig checkout",
+      what: "The Git repo the rig works in.",
+      where: "~/scratch",
+      cmds: ["git -C ~/scratch log --oneline --all -5", "git merge sc-omn/hello-world"],
+      note: "The default worker branches and commits right in this checkout. Stay out of it while a worker is active."
+    },
+    worktrees: {
+      x: 825, y: 580, lx: 840, ly: 585, anchor: "start", name: "Worktrees", dashed: true,
+      what: "Separate Git worktrees per bead, so workers don't share your checkout. mol-do-work doesn't set them up.",
+      where: "Wherever an agent's work_dir points. Gas City prunes worktrees under ~/city/.gc/worktrees.",
+      cmds: ["work_dir = \"...\"  (agent config)", "pre_start = [\"git worktree add ...\"]"],
+      note: "An epic-loop port needs these to keep one bead's branch out of another's way."
+    }
+  };
+
+  var EDGES = [
+    { id: "C1", route: "control", from: "supervisor", to: "controller", pts: [[290,110],[430,110]] },
+    { id: "C2", route: "control", from: "controller", to: "sessions", pts: [[430,110],[480,110],[480,165],[790,165],[790,330],[825,330]] },
+    { id: "C3", route: "control", from: "orders", to: "formulas", pts: [[290,430],[290,330]] },
+    { id: "F1", route: "config", from: "config", to: "packs", pts: [[290,220],[430,220]] },
+    { id: "F2", route: "config", from: "packs", to: "providers", pts: [[430,220],[570,220]] },
+    { id: "F3", route: "config", from: "packs", to: "agents", pts: [[430,220],[430,330]] },
+    { id: "F4", route: "config", from: "providers", to: "sessions", pts: [[570,220],[825,220],[825,330]] },
+    { id: "W1", route: "work", from: "you", to: "formulas", pts: [[105,110],[105,330],[290,330]] },
+    { id: "W2", route: "work", from: "formulas", to: "agents", pts: [[290,330],[430,330]] },
+    { id: "W3", route: "work", from: "agents", to: "sessions", pts: [[430,330],[825,330]] },
+    { id: "W4", route: "work", from: "sessions", to: "repo", pts: [[825,330],[825,440]] },
+    { id: "S1", route: "store", from: "citystore", to: "dolt", pts: [[300,600],[440,600]] },
+    { id: "S2", route: "store", from: "dolt", to: "rigstore", pts: [[440,600],[570,600]] },
+    { id: "S3", route: "store", from: "rigstore", to: "sessions", pts: [[570,600],[720,600],[720,330],[825,330]] },
+    { id: "K1", route: "claude", from: "claudecfg", to: "sessions", pts: [[105,450],[105,520],[905,520],[905,330],[825,330]] },
+    { id: "E1", route: "events", from: "events", to: "api", pts: [[430,430],[620,430],[620,110],[570,110]] },
+    { id: "E2", route: "events", from: "api", to: "you", pts: [[570,110],[570,82],[105,82],[105,110]] },
+    { id: "X1", route: "planned", from: "repo", to: "worktrees", pts: [[825,440],[825,580]] }
+  ];
+
+  var STEPS = [
+    {
+      title: "You sling a task",
+      nodes: ["you", "formulas", "rigstore"], edges: ["W1"],
+      html: "<p>From <code>~/city</code> you run <code>gc sling scratch/claude \"Create a script that prints hello world\"</code>.</p><p>Gas City writes a task bead (<code>sc-omn</code>), wraps it in an input convoy (<code>sc-mlb</code>) and pours the agent's default formula, <code>mol-do-work</code>, as a workflow (<code>sc-33w</code>). All three land in the rig store.</p>"
+    },
+    {
+      title: "The work is routed to a pool",
+      nodes: ["formulas", "agents", "controller", "rigstore"], edges: ["W2"],
+      html: "<p>The bead is routed to <code>scratch/claude</code>. On its next tick the controller counts claimable work for that agent, and the pool's desired size goes from 0 to 1.</p><p>In <code>gc supervisor logs</code> this shows as <code>poolDesired: scratch/claude = 1</code>.</p>"
+    },
+    {
+      title: "The controller starts a session",
+      nodes: ["controller", "sessions", "citystore", "dolt"], edges: ["C2", "S1"],
+      html: "<p>The controller writes a session record to the city store, with an ID like <code>ci-ffc</code>. It starts as <code>start-pending</code> and moves to <code>creating</code> while the process launches.</p>"
+    },
+    {
+      title: "The provider launches Claude",
+      nodes: ["providers", "claudecfg", "sessions"], edges: ["F4", "K1"],
+      html: "<p>Provider settings plus your patches become the launch command, run in a tmux pane in <code>~/scratch</code>:</p><p><code>claude --dangerously-skip-permissions --effort max --settings ~/city/.gc/settings.json</code></p><p>Claude then reads <code>~/.claude</code>, or <code>CLAUDE_CONFIG_DIR</code> if the patch sets it. This is where an unanswered folder-trust prompt kills the pane, and the pool keeps retrying.</p>"
+    },
+    {
+      title: "The worker claims the bead",
+      nodes: ["sessions", "rigstore", "dolt"], edges: ["S3", "S2"],
+      html: "<p>The worker runs <code>gc hook --claim --drain-ack --json</code>, which hands it <code>sc-omn</code>.</p><p>The bead still shows <code>OPEN</code>. The claim and a <code>gc.last_heartbeat_at</code> timestamp go into its metadata.</p>"
+    },
+    {
+      title: "The work happens in the rig",
+      nodes: ["sessions", "repo", "worktrees"], edges: ["W4", "X1"],
+      html: "<p>The worker creates the branch <code>sc-omn/hello-world</code> and commits in <code>~/scratch</code>'s own checkout. <code>mol-do-work</code> sets up no worktree, so the dashed station stays unused.</p>"
+    },
+    {
+      title: "The bead closes",
+      nodes: ["sessions", "rigstore", "dolt"], edges: ["S3", "S2"],
+      html: "<p>The worker records <code>gc.work_branch</code>, <code>gc.work_commit</code>, <code>gc.work_outcome</code> and <code>gc.work_verification</code>, then closes the bead. The convoy closes with it.</p><p>Merging the branch is left to you.</p>"
+    },
+    {
+      title: "You watch it all",
+      nodes: ["events", "api", "you", "sessions"], edges: ["E1", "E2"],
+      html: "<p>Every transition lands in <code>~/city/.gc/events.jsonl</code>. The dashboard on port 8372 and <code>gc events --follow</code> both read from it, and <code>gc session peek</code> shows the worker's screen without attaching.</p>"
+    }
+  ];
+
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var svg = document.getElementById("map");
+  var panel = document.getElementById("panel");
+  var legend = document.getElementById("legend");
+  var modeBtn = document.getElementById("modeBtn");
+
+  var state = { mode: "explore", selected: null, route: null, step: 0 };
+  var edgeEls = {};
+  var nodeEls = {};
+
+  function el(name, attrs, parent) {
+    var e = document.createElementNS(SVGNS, name);
+    for (var k in attrs) { e.setAttribute(k, attrs[k]); }
+    if (parent) { parent.appendChild(e); }
+    return e;
+  }
+
+  function roundedPath(pts, r) {
+    var d = "M" + pts[0][0] + " " + pts[0][1];
+    for (var i = 1; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+      var d1 = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+      var d2 = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+      var rr = Math.min(r, d1 / 2, d2 / 2);
+      var ax = p1[0] - (p1[0] - p0[0]) / d1 * rr;
+      var ay = p1[1] - (p1[1] - p0[1]) / d1 * rr;
+      var bx = p1[0] + (p2[0] - p1[0]) / d2 * rr;
+      var by = p1[1] + (p2[1] - p1[1]) / d2 * rr;
+      d += " L" + ax + " " + ay + " Q" + p1[0] + " " + p1[1] + " " + bx + " " + by;
+    }
+    var last = pts[pts.length - 1];
+    d += " L" + last[0] + " " + last[1];
+    return d;
+  }
+
+  function draw() {
+    var zg = el("g", {}, svg);
+    ZONES.forEach(function (z) {
+      var g = el("g", { "class": "zone" }, zg);
+      el("rect", { x: z.x, y: z.y, width: z.w, height: z.h, rx: 12 }, g);
+      var t = el("text", { x: z.x + 12, y: z.y + h(z) }, g);
+      t.textContent = z.label;
+    });
+    function h(z) { return z.y === 40 || z.y === 495 ? 22 : 22; }
+
+    var eg = el("g", {}, svg);
+    EDGES.forEach(function (e) {
+      var o = ROUTE_OFFSET[e.route] || 0;
+      var pts = e.pts.map(function (p) { return [p[0] + o, p[1] + o]; });
+      var path = el("path", {
+        d: roundedPath(pts, 14),
+        "class": "edge" + (e.route === "planned" ? " planned" : ""),
+        stroke: "var(" + ROUTES[e.route].color + ")"
+      }, eg);
+      edgeEls[e.id] = path;
+    });
+
+    var ng = el("g", {}, svg);
+    Object.keys(NODES).forEach(function (id) {
+      var n = NODES[id];
+      var g = el("g", {
+        "class": "station" + (n.dashed ? " dashed" : ""),
+        tabindex: "0",
+        role: "button",
+        "aria-label": n.name
+      }, ng);
+      el("circle", { "class": "ring", cx: n.x, cy: n.y, r: 16 }, g);
+      el("circle", { "class": "dot", cx: n.x, cy: n.y, r: 9 }, g);
+      var t = el("text", { x: n.lx, y: n.ly, "text-anchor": n.anchor }, g);
+      t.textContent = n.name;
+      g.addEventListener("click", function () { selectNode(id); });
+      g.addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(id); }
+      });
+      nodeEls[id] = g;
+    });
+  }
+
+  function buildLegend() {
+    Object.keys(ROUTES).forEach(function (rid) {
+      var r = ROUTES[rid];
+      var b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("aria-pressed", "false");
+      b.dataset.route = rid;
+      if (rid === "planned") { b.className = "planned"; }
+      var sw = document.createElement("span");
+      sw.className = "swatch";
+      if (rid !== "planned") { sw.style.background = "var(" + r.color + ")"; }
+      b.appendChild(sw);
+      b.appendChild(document.createTextNode(r.name));
+      b.addEventListener("click", function () { selectRoute(rid); });
+      legend.appendChild(b);
+    });
+  }
+
+  function highlight(nodeSet, edgeSet) {
+    Object.keys(nodeEls).forEach(function (id) {
+      nodeEls[id].classList.toggle("dim", !!nodeSet && !nodeSet[id]);
+      nodeEls[id].classList.toggle("selected", state.mode === "explore" && state.selected === id);
+    });
+    Object.keys(edgeEls).forEach(function (id) {
+      edgeEls[id].classList.toggle("dim", !!edgeSet && !edgeSet[id]);
+    });
+    Array.prototype.forEach.call(legend.children, function (b) {
+      b.setAttribute("aria-pressed", String(state.mode === "explore" && state.route === b.dataset.route));
+    });
+  }
+
+  function setOf(arr) {
+    var s = {};
+    arr.forEach(function (x) { s[x] = true; });
+    return s;
+  }
+
+  function esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  function routeChips(id) {
+    var seen = {};
+    EDGES.forEach(function (e) {
+      if (e.from === id || e.to === id) { seen[e.route] = true; }
+    });
+    return Object.keys(seen).map(function (rid) {
+      var bg = rid === "planned" ? "var(--muted)" : "var(" + ROUTES[rid].color + ")";
+      return '<span style="background:' + bg + '">' + esc(ROUTES[rid].name) + "</span>";
+    }).join("");
+  }
+
+  function selectNode(id) {
+    if (state.mode === "trace") { state.mode = "explore"; modeBtn.textContent = "Trace a job"; }
+    state.selected = id;
+    state.route = null;
+    var n = NODES[id];
+    var nodes = {}; var edges = {};
+    nodes[id] = true;
+    EDGES.forEach(function (e) {
+      if (e.from === id || e.to === id) {
+        edges[e.id] = true; nodes[e.from] = true; nodes[e.to] = true;
+      }
+    });
+    highlight(nodes, edges);
+    panel.innerHTML =
+      "<h2>" + esc(n.name) + "</h2>" +
+      '<div class="routes">' + routeChips(id) + "</div>" +
+      "<p>" + esc(n.what) + "</p>" +
+      "<h3>Where it lives</h3><p>" + esc(n.where) + "</p>" +
+      "<h3>Commands</h3><ul class=\"cmds\">" + n.cmds.map(function (c) { return "<li>" + esc(c) + "</li>"; }).join("") + "</ul>" +
+      "<h3>From the first install</h3><p class=\"note\">" + esc(n.note) + "</p>";
+  }
+
+  var ROUTE_TEXT = {
+    work: "The path a job takes: you sling it, a formula shapes it, an agent pool picks it up, a session does it and the result lands in the rig's checkout.",
+    control: "The supervisor runs the controller. The controller starts and stops sessions to match demand, and orders fire formulas on their own schedule.",
+    config: "city.toml imports packs and sets up providers. Packs supply the agents, and providers turn an agent into a launch command for a session.",
+    store: "Every bead lives in Dolt. The city store holds session records, the rig store holds the work, and workers read and write the rig store with bd.",
+    claude: "Each Claude session reads a user config directory. Unless the agent patch sets CLAUDE_CONFIG_DIR, that's your own ~/.claude.",
+    events: "Everything that changes is written to the event log, which the dashboard and gc events --follow read back to you.",
+    planned: "Per-bead worktrees exist in Gas City, but the default mol-do-work formula doesn't use them."
+  };
+
+  function selectRoute(rid) {
+    if (state.mode === "trace") { state.mode = "explore"; modeBtn.textContent = "Trace a job"; }
+    if (state.route === rid) { reset(); return; }
+    state.route = rid;
+    state.selected = null;
+    var nodes = {}; var edges = {};
+    EDGES.forEach(function (e) {
+      if (e.route === rid) { edges[e.id] = true; nodes[e.from] = true; nodes[e.to] = true; }
+    });
+    highlight(nodes, edges);
+    var stations = Object.keys(nodes).map(function (id) { return NODES[id].name; });
+    panel.innerHTML =
+      "<h2>" + esc(ROUTES[rid].name) + " line</h2>" +
+      "<p>" + esc(ROUTE_TEXT[rid]) + "</p>" +
+      "<h3>Stations on this line</h3><p>" + esc(stations.join(", ")) + "</p>" +
+      '<p class="hint">Pick the line again to clear it, or pick a station for details.</p>';
+  }
+
+  function renderStep() {
+    var s = STEPS[state.step];
+    highlight(setOf(s.nodes), setOf(s.edges));
+    var list = STEPS.map(function (st, i) {
+      return '<li data-i="' + i + '"' + (i === state.step ? ' class="current" aria-current="step"' : "") + ">" + esc(st.title) + "</li>";
+    }).join("");
+    panel.innerHTML =
+      "<h2>" + esc(s.title) + "</h2>" + s.html +
+      '<div class="stepnav">' +
+      '<button type="button" id="prevBtn"' + (state.step === 0 ? " disabled" : "") + ">Back</button>" +
+      '<button type="button" id="nextBtn"' + (state.step === STEPS.length - 1 ? " disabled" : "") + ">Next</button>" +
+      '<span class="count">Step ' + (state.step + 1) + " of " + STEPS.length + "</span></div>" +
+      '<ol class="steps">' + list + "</ol>";
+    document.getElementById("prevBtn").addEventListener("click", function () { go(state.step - 1); });
+    document.getElementById("nextBtn").addEventListener("click", function () { go(state.step + 1); });
+    Array.prototype.forEach.call(panel.querySelectorAll("ol.steps li"), function (li) {
+      li.addEventListener("click", function () { go(Number(li.dataset.i)); });
+    });
+  }
+
+  function go(i) {
+    if (i < 0 || i >= STEPS.length) { return; }
+    state.step = i;
+    renderStep();
+    var focusBtn = document.getElementById(i === STEPS.length - 1 ? "prevBtn" : "nextBtn");
+    if (focusBtn) { focusBtn.focus(); }
+  }
+
+  function reset() {
+    state.selected = null;
+    state.route = null;
+    highlight(null, null);
+    panel.innerHTML =
+      "<h2>One city, one rig</h2>" +
+      "<p>Each station is a part of Gas City. Each colored line is one kind of connection between them: work moving through, the controller managing sessions, config feeding agents, beads in Dolt, Claude's user config and the event log.</p>" +
+      "<p>The dashed station is something Gas City supports that the default worker doesn't use yet.</p>" +
+      '<p class="hint">Select a station or a line to start, or use Trace a job to follow one task from sling to close.</p>';
+  }
+
+  modeBtn.addEventListener("click", function () {
+    if (state.mode === "explore") {
+      state.mode = "trace";
+      state.selected = null;
+      state.route = null;
+      state.step = 0;
+      modeBtn.textContent = "Stop tracing";
+      renderStep();
+    } else {
+      state.mode = "explore";
+      modeBtn.textContent = "Trace a job";
+      reset();
+    }
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (state.mode !== "trace") { return; }
+    if (ev.key === "ArrowRight") { go(state.step + 1); }
+    if (ev.key === "ArrowLeft") { go(state.step - 1); }
+  });
+
+  draw();
+  buildLegend();
+  reset();
+})();
+</script>
+</body>
+</html>
