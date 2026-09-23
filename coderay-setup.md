@@ -161,7 +161,7 @@ ps eww -p "$(pgrep -f 'gc supervisor' | head -1)" | grep -q 'ANTHROPIC_API_KEY='
 
 When this was written it printed `supervisor: no key`, even though `launchctl getenv ANTHROPIC_API_KEY` was set. If it ever prints `HAS the key`, find where the supervisor picks it up before you sling work.
 
-## 8. Give workers their own Claude config and trust the clone (not yet run)
+## 8. Give workers their own Claude config and trust the clone (verified)
 
 Follow "Give workers their own Claude config" in runbook step 7, running the one-time `claude` command in this rig:
 
@@ -171,7 +171,32 @@ cd ~/gc-rigs/coderay
 CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions
 ```
 
-Answer every prompt, including _Yes, I trust this folder_, then `/exit`. Then add `CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc-worker"` to the coderay patch's `env`, and add `observe_paths` under `[daemon]`, as the runbook shows. Validate again.
+Answer every prompt, including _Yes, I trust this folder_, then `/exit`. Check that the answers were saved:
+
+```bash
+python3 -c "
+import json; d = json.load(open('$HOME/.claude-gc-worker/.claude.json'))
+print('trusted:', d['projects']['$HOME/gc-rigs/coderay'].get('hasTrustDialogAccepted'))
+print('logged in:', bool(d.get('oauthAccount')))"
+cat ~/.claude-gc-worker/settings.json
+```
+
+Expect `trusted: True`, `logged in: True`, and `"skipDangerousModePermissionPrompt": true` in `settings.json`.
+
+Then add `CLAUDE_CONFIG_DIR` to the front of the coderay patch's `env`:
+
+```toml
+env = { CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc-worker", GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
+```
+
+If `city.toml` has no `[daemon]` table yet, add one near the top, after `[workspace]`:
+
+```toml
+[daemon]
+observe_paths = ["/Users/markalston/.claude-gc-worker/projects"]
+```
+
+Validate again with `gc config show --validate`, and rerun the `awk` check from step 7. It should now also show `CLAUDE_CONFIG_DIR`.
 
 If you skip the separate config for now, still trust the folder with plain `claude` in `~/gc-rigs/coderay`. Otherwise the first worker loops on the trust prompt.
 
