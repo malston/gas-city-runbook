@@ -257,7 +257,7 @@ It should quote the first bullet. This is an instruction, not a lock, so a worke
 
 It should say `/Users/markalston/code/coderay`. If it says `gc-rigs`, run `pip install -e .` from `~/code/coderay` with that same `pip`.
 
-## 9. Route a first job (not yet run)
+## 9. Route a first job (verified)
 
 Pick something small and self-contained, then sling it from `~/city` with your own description in the quotes:
 
