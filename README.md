@@ -74,3 +74,15 @@ More in [terminology.md](terminology.md).
 ## Troubleshooting
 
 The symptom-to-fix table is at the end of [SETUP.md](SETUP.md#troubleshooting). The coderay recipe has its own.
+
+## Sources
+
+Yegge's own writing on the ideas behind Gas City. The "dark factory" and "light factory" quotes in [terminology.md](terminology.md) come from the first one.
+
+- Steve Yegge, [Welcome to Gas City](https://yegge.ai/essays/welcome-to-gas-city/), 2026-04-24. Defines a dark factory and calls Gas City "a Light Factory… or at least, a very well-lit dark one!"
+- Steve Yegge, [Gas Town](https://yegge.ai/gastown). Calls Gas Town "an early example of a "Dark Factory," a system where agents work together autonomously in the background."
+
+Secondhand write-ups that cover the same framing:
+
+- Sébastien Dubois, [Gas City](https://www.dsebastien.net/gas-city/)
+- Dave's Ground Truth, [Turning the Dark Factory Lights On](https://www.davesgroundtruth.com/turning-the-dark-factory-lights-on/)
