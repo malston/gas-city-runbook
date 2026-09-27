@@ -332,4 +332,4 @@ This removes the `[[rigs]]` entry and the rig's path binding. It doesn't remove 
 | `git status` shows `.beads/identity.toml`                                    | The `!.beads/identity.toml` line in `.gitignore` un-ignores it       | Add `identity.toml` to `.beads/.gitignore` (step 4) |
 | `git pull` in the clone refuses to overwrite `.gitignore` or a `.beads` file | Upstream changed a `--skip-worktree` file                            | See the end of step 4                               |
 | `bd show coderay-xxx` fails in the clone                                     | The clone's store is `cr`. `coderay-` beads live in `~/code/coderay` | Run it in `~/code/coderay`                          |
-| Worker loops in `start-pending`                                              | Trust or first-run prompt unanswered for this folder                 | Step 8, and the runbook's troubleshooting table     |
+| Worker loops in `start-pending`                                              | Trust or first-run prompt unanswered for this folder                 | Step 8, and [SETUP.md's troubleshooting table](../SETUP.md#troubleshooting)     |

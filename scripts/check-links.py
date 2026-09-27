@@ -4,8 +4,9 @@
 Use it after moving, renaming or retitling a doc. It reads every *.md file in
 the repo (skipping .git and .remember), resolves each relative link against the
 linking file, and checks that the target exists. For links with a #fragment
-into a Markdown file, it checks the fragment matches a heading slug the way
-GitHub builds them. External http(s) links are not fetched.
+into a Markdown file, it checks the fragment matches a heading slug built from
+plain heading text. Headings with emphasis, links or duplicates slug differently
+on GitHub and will be reported wrongly. External http(s) links are not fetched.
 
 Usage: scripts/check-links.py [-h]
 
