@@ -1,6 +1,6 @@
 # Gas City runbook
 
-Operating notes for [Gas City](https://github.com/gastownhall/gascity), the orchestrator that routes beads of work to coding-agent sessions running in your Git repos. These notes take a Mac from nothing to a city with a tuned Claude Code worker, then cover routing, watching and merging its jobs, and adding a real project as a rig.
+Operating notes for [Gas City](https://gascity.com/) ([source](https://github.com/gastownhall/gascity)), the orchestrator that routes beads of work to coding-agent sessions running in your Git repos. These notes take a Mac from nothing to a city with a tuned Claude Code worker, then cover routing, watching and merging its jobs, and adding a real project as a rig.
 
 Written against **Gas City 1.4.2** and **bd 1.3.0** on macOS, from a first install and a first real rig (coderay). Steps say what they printed on that build. The gascity docs track `main`, which runs ahead of the Homebrew release, so re-check after `brew upgrade gascity`.
 
@@ -76,6 +76,11 @@ More in [terminology.md](terminology.md).
 The symptom-to-fix table is at the end of [SETUP.md](SETUP.md#troubleshooting). The coderay recipe has its own.
 
 ## Sources
+
+The project:
+
+- [gascity.com](https://gascity.com/), the Gas City site
+- [gastownhall/gascity](https://github.com/gastownhall/gascity), the source and docs. Read them at the tag matching `gc version`
 
 Yegge's own writing on the ideas behind Gas City. The "dark factory" and "light factory" quotes in [terminology.md](terminology.md) come from the first one.
 
