@@ -1,6 +1,6 @@
 # Adding coderay to Gas City
 
-This adds coderay as a rig in an existing city, so Gas City workers can take coderay tasks. It assumes [gas-city-setup.md](gas-city-setup.md) steps 1 to 4 are done: Gas City is installed, the `gc` alias is gone, Dolt has an identity, and `~/city` is running. Steps marked _verified_ were run on Gas City 1.4.2 and bd 1.3.0, and the output shown is what they printed.
+This adds coderay as a rig in an existing city, so Gas City workers can take coderay tasks. It assumes [SETUP.md](../SETUP.md) steps 1 to 4 are done: Gas City is installed, the `gc` alias is gone, Dolt has an identity, and `~/city` is running. Steps marked _verified_ were run on Gas City 1.4.2 and bd 1.3.0, and the output shown is what they printed.
 
 ## Why a separate clone
 
@@ -150,7 +150,7 @@ The clone has no `.env`, since it's gitignored. The tests don't need an API key.
 
 ## 7. Tune the worker (verified)
 
-Add a patch to the end of `~/city/city.toml`, the same shape as runbook step 7 with `dir = "coderay"`:
+Add a patch to the end of `~/city/city.toml`, the same shape as [SETUP.md](../SETUP.md) step 7 with `dir = "coderay"`:
 
 ```toml
 [[patches.agent]]
@@ -186,7 +186,7 @@ When this was written it printed `supervisor: no key`, even though `launchctl ge
 
 ## 8. Give workers their own Claude config and trust the clone (verified)
 
-Follow "Give workers their own Claude config" in runbook step 7, running the one-time `claude` command in this rig:
+Follow "Give workers their own Claude config" in [SETUP.md](../SETUP.md) step 7, running the one-time `claude` command in this rig:
 
 ```bash
 mkdir -p ~/.claude-gc-worker
@@ -266,7 +266,7 @@ cd ~/city
 gc sling coderay/claude "Describe one small coderay task here"
 ```
 
-Expect a `cr-` bead and a `mol-do-work` workflow, then watch it as in runbook step 9, with `gc bd --rig coderay show <cr-id>`. Stay out of the clone's checkout while a worker has it.
+Expect a `cr-` bead and a `mol-do-work` workflow, then watch it as in [recipe 2](02-watch-a-worker.md), with `gc bd --rig coderay show <cr-id>`. Stay out of the clone's checkout while a worker has it.
 
 The sling text becomes the bead's title only. Its description is `(none)`, and the worker can't read your `coderay-` beads. To hand over one of those beads in full, copy its description into the new `cr-` bead right after the sling:
 

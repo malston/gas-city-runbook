@@ -1,6 +1,6 @@
 # Setting up Gas City on a new Mac
 
-This runbook takes a fresh macOS machine to a running Gas City with one rig and a first job routed to a Claude Code agent. It's written from a first install of Gas City 1.4.2 and folds in every problem that install hit, so you can run it top to bottom without detours.
+This runbook takes a fresh macOS machine to a running Gas City with one rig whose Claude Code worker is ready for a first job. It's written from a first install of Gas City 1.4.2 and folds in every problem that install hit, so you can run it top to bottom without detours.
 
 Each step says what to expect. If the output differs, check [Troubleshooting](#troubleshooting) before moving on.
 
@@ -197,115 +197,7 @@ Validate again with `gc config show --validate`. The change applies to the next 
 
 The quickest check is `gc session peek` on the next worker. The status area at the bottom should no longer show your personal status lines (the token-ledger, context-lens and quota-meter lines). `ls ~/.claude-gc-worker/projects` should also gain an entry for the rig once the worker has run. If the session loops in `start-pending` instead, check `start-stderr.log` as in the troubleshooting table. The most likely cause is a first-run prompt the manual setup didn't answer.
 
-## 8. Route a first job
-
-From `~/city`, sling a task to the rig's Claude agent. Use the qualified name.
-
-```bash
-gc sling scratch/claude "Create a script that prints hello world"
-```
-
-Output looks like this:
-
-```text
-Created sc-omn — "Create a script that prints hello world"
-Attached workflow sc-33w (formula "mol-do-work") to sc-33w
-Dashboard: http://127.0.0.1:8372/city/city/runs/sc-33w
-```
-
-`sc-omn` is the task bead. `sc-33w` is the workflow the agent follows, taken from its default formula `mol-do-work`.
-
-### Or hand it to the mayor
-
-The Gas City README takes a different route. You create the bead yourself and let the mayor decide who works on it. That's closer to how a city is meant to run day to day. Slinging straight to `scratch/claude` is more predictable when you're testing one worker, which is why this runbook uses it first.
-
-Create the bead from inside the rig, so it lands in the rig's store with an `sc-` ID:
-
-```bash
-cd ~/scratch
-bd create "Create a script that prints hello world"
-```
-
-A bead made this way just sits in the store. Nothing routes it until someone slings it. Attach to the mayor and ask it to take care of the bead:
-
-```bash
-cd ~/city
-gc session attach mayor
-```
-
-Tell it something like "Route sc-xxx to a worker in the scratch rig," using the ID `bd create` printed. The mayor ships with a skill for planning, creating beads and starting workflows, so it slings the bead for you. Detach with `Ctrl-b d` and watch the work the same way as in step 9.
-
-You can also skip the mayor and route an existing bead yourself. `gc sling` accepts a bead ID as well as plain text:
-
-```bash
-cd ~/city
-gc sling scratch/claude sc-xxx
-```
-
-The README also runs `gc start` right after `gc init`. In 1.4.2 `gc init` already registers and starts the city unless you pass `--no-start`, so the extra `gc start` is harmless but only needed when `init` stopped early, as it does without a Dolt identity.
-
-To confirm the worker launched with your patched flags, watch for its start command:
-
-```bash
-gc events --follow | grep -o '"command":"claude[^"]*"'
-```
-
-It should show `--effort medium --model claude-sonnet-5`. This only prints new events, so start it before the `sling` or wait for the next session.
-
-## 9. Watch it work
-
-The dashboard link from `sling` is the easiest view. It shows each step of the workflow as it moves from pending to running to closed, and the _Session_ tab shows the agent's live session.
-
-From the terminal:
-
-```bash
-gc session list
-gc session peek <session-id>
-gc bd --rig scratch show sc-omn
-```
-
-A healthy worker keeps the same ID with a growing `AGE`. `peek` shows its screen without attaching. `gc bd --rig` reads the rig's store from anywhere, and plain `bd show` from inside `~/scratch` works too. Plain `bd show` from `~/city` looks in the city's store and reports `no issue found`.
-
-The bead stays `OPEN` the whole time the worker has it. Gas City records the claim in metadata, and `gc.last_heartbeat_at` shows the worker checking in.
-
-To attach instead of peeking, run `gc session attach <session-id>` and detach with `Ctrl-b d` so the session keeps running.
-
-While a worker is active, stay out of the rig's Git checkout. The default worker has no worktree. It creates a branch named after the bead and checks it out right in `~/scratch`, so switching branches or committing there pulls the branch out from under it. Your shell prompt's own `git status` is harmless, but the worker notices it and says another command ran in the repository.
-
-Don't run the commands you see in `peek` yourself. `gc hook --claim --drain-ack --json` is the worker asking the city for work. In your shell it fails with `agent not specified`, and if you pass it an agent name it will claim beads meant for the worker.
-
-## 10. What the first job leaves behind
-
-When the bead closes, the worker switches the rig back to `main`, and the bead carries structured results in its metadata:
-
-```text
-gc.work_branch: sc-omn/hello-world
-gc.work_commit: 1ceb413...
-gc.work_outcome: shipped
-gc.work_verification: bats hello.bats; shellcheck hello.sh hello.bats; ...
-```
-
-Those fields are what a formula or an order can read later, which is handy for the epic-loop port. Merging is still yours to do, since there's no remote and so no PR:
-
-```bash
-cd ~/scratch
-git log --oneline --all -5
-git merge sc-omn/hello-world
-```
-
-`gc rig add` also leaves files uncommitted in the rig: `.gitignore`, `.beads/metadata.json`, `.beads/identity.toml` and `.gc/`. Read `git diff .gitignore` before committing any of them. `.gc/` is runtime state and belongs in `.gitignore`, not in the repo's history.
-
-## What to expect on the dashboard
-
-A few things on the first run look odd but are normal.
-
-The run header shows `V1`. `mol-do-work` uses the older formula compiler. Formulas you write should declare `formula_compiler = ">=2.0.0"` to get `check`, `retry` and `drain`.
-
-The _Diff_ tab says no diff is available because the run recorded no `work_dir`. That's the missing worktree from step 9. A port of the epic loop needs to set up per-bead worktrees itself. In 1.4.2 there's no `gc worktree` command for that. It's config and script wiring: an agent's `work_dir` plus a `pre_start` script that runs `git worktree add`.
-
-_Health_ may show a badge, and `gc supervisor logs` may show `slow_storage_degraded` traces. Those point at Dolt. A brief `dolt circuit breaker is open` error is also possible. It happened once on the first install and cleared by itself within a minute, since the breaker retries every 5 seconds. `gc beads health` checks the store and tries to recover it, and `gc doctor` covers the rest.
-
-`gc doctor` on a fresh city shows three warnings that need no action for a scratch rig. `formula-requirements` is about bundled pack formulas, not yours. `jsonl-archive` means the event archive has no off-box copy. `rig:<name>:dolt-backup` means the rig's beads have no backup registered, and its hint has the command to fix that for a rig you care about.
+When step 7 validates, route the first job with [recipe 1](recipes/01-first-job.md).
 
 ## Stopping and removing
 
