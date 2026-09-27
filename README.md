@@ -6,7 +6,7 @@ Written against **Gas City 1.4.2** and **bd 1.3.0** on macOS, from a first insta
 
 ## Why this exists
 
-A default city runs your personal Claude Code setup at maximum effort, dies in a restart loop on first-run prompts, and leaves commits under your name in branches you didn't expect. These notes are the short path around it.
+A default city runs your personal Claude Code setup at maximum effort, dies in a restart loop on first-run prompts, and commits under your own Git identity. These notes are the short path around it.
 
 ## Docs
 
@@ -28,8 +28,8 @@ Reference:
 
 ## Scripts
 
-| Script                                           | Does                                                                        |
-| ------------------------------------------------ | --------------------------------------------------------------------------- |
+| Script                                             | Does                                                                                         |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | [`scripts/check-links.py`](scripts/check-links.py) | Checks every relative link and `#anchor` in the docs. Run it after moving or retitling a doc |
 
 ## Prerequisites
@@ -37,7 +37,7 @@ Reference:
 ```sh
 gc version                  # 1.4.2
 bd version                  # bd version 1.3.0 (Homebrew)
-claude --version            # installed and signed in
+claude --version            # installed; sign in before SETUP step 4
 dolt config --global --list # user.name and user.email set (SETUP step 3)
 type gc                     # /opt/homebrew/bin/gc, not a git alias (SETUP step 2)
 ```

@@ -2,7 +2,7 @@
 
 The orientation for Gas City: how it orchestrates fleets of agents, and the six primitives that compose into that orchestration.
 
-Copied from [`docs/getting-started/how-gas-city-works.md`](https://github.com/gastownhall/gascity/blob/v1.4.2/docs/getting-started/how-gas-city-works.md) at the gascity `v1.4.2` tag. Only punctuation and links were changed, so the links resolve on GitHub.
+Copied from [`docs/getting-started/how-gas-city-works.md`](https://github.com/gastownhall/gascity/blob/v1.4.2/docs/getting-started/how-gas-city-works.md) at the gascity `v1.4.2` tag. The frontmatter became this heading and summary, em dashes became other punctuation, and site links now point at GitHub. The text is otherwise unchanged.
 
 Gas City **orchestrates fleets of coding agents** through real engineering work.
 You write a **formula** (a method for how a job gets done) and the

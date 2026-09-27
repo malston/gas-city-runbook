@@ -45,7 +45,7 @@ cd ~/city
 gc sling scratch/claude sc-xxx
 ```
 
-The README also runs `gc start` right after `gc init`. In 1.4.2 `gc init` already registers and starts the city unless you pass `--no-start`, so the extra `gc start` is harmless but only needed when `init` stopped early, as it does without a Dolt identity.
+The Gas City README also runs `gc start` right after `gc init`. In 1.4.2 `gc init` already registers and starts the city unless you pass `--no-start`, so the extra `gc start` is harmless but only needed when `init` stopped early, as it does without a Dolt identity.
 
 To confirm the worker launched with your patched flags, watch for its start command:
 

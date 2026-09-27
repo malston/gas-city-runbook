@@ -1,4 +1,4 @@
-# Adding coderay to Gas City
+# 4. Add coderay as a rig
 
 This adds coderay as a rig in an existing city, so Gas City workers can take coderay tasks. It assumes [SETUP.md](../SETUP.md) steps 1 to 4 are done: Gas City is installed, the `gc` alias is gone, Dolt has an identity, and `~/city` is running. Steps marked _verified_ were run on Gas City 1.4.2 and bd 1.3.0, and the output shown is what they printed.
 
