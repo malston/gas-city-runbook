@@ -61,21 +61,17 @@ Run `gc` commands from `~/city`. Most of them find the city by walking up from t
 
 More in [terminology.md](terminology.md).
 
-## Five traps
+## Before you paste a command
 
-**The Oh My Zsh `gc` alias runs `git commit`.** Until it's gone, `gc sling` fails with `error: pathspec 'sling' did not match any file(s) known to git`. Zsh expands aliases when it reads a pasted block, so `unalias gc` and `gc version` pasted together still run Git on the second line. [SETUP step 2](SETUP.md#2-remove-the-oh-my-zsh-gc-alias).
+These notes began as a chat with Claude, and most of what went wrong on the first install came from pasting its commands without checking them against the Gas City docs.
 
-**Claude's folder-trust prompt kills workers in a loop.** A session has nobody to answer "Is this a project you created or one you trust?", so it dies, the pool replaces it, and `gc session list` shows a new ID every few seconds. `--dangerously-skip-permissions` doesn't cover this prompt. Run `claude` once in every new rig, and again under the worker's `CLAUDE_CONFIG_DIR`.
+- Install from the official [installation guide](https://docs.gascity.com/getting-started/installation). It covers the Oh My Zsh `gc` alias that tripped the first install.
+- Past install, read the docs in the [gascity repo](https://github.com/gastownhall/gascity) at the tag matching `gc version`, so the examples match your binary.
+- Check a command with `gc <command> --help` before you trust it, whether it came from a chat or from these notes.
+- Paste one line at a time. Zsh expands aliases when it reads a pasted block, so a fix on one line may not apply to the next.
+- Run `gc config show --validate` after every `city.toml` edit.
 
-**An untuned worker is you at maximum effort.** It launches Opus at `--effort max` with your `~/.claude` rules, skills and Git identity. The first hello world took about 20 minutes and cost $4.76. Patch it with a city-level `[[patches.agent]]` and give it its own `CLAUDE_CONFIG_DIR`. A rig-level `[[rigs.patches]]` block can't reach implicit agents. [SETUP step 7](SETUP.md#7-tune-the-rigs-worker-before-the-first-job).
-
-**A `city.toml` that fails to load stalls running workers.** Their `gc bd` calls fail until the file loads again. Run `gc config show --validate` after every edit.
-
-**Stay out of the rig's checkout while a worker has it.** The default worker has no worktree. It checks out its bead's branch right in the rig, so switching branches or committing there pulls the branch out from under it. Watch with `gc session peek`, and don't run the `gc hook` commands you see there.
-
-## Troubleshooting
-
-The symptom-to-fix table is at the end of [SETUP.md](SETUP.md#troubleshooting). The coderay recipe has its own.
+When something breaks anyway, find the symptom in the [troubleshooting table](SETUP.md#troubleshooting). The coderay recipe has its own.
 
 ## Sources
 

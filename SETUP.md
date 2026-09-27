@@ -50,6 +50,8 @@ ls -l "$(command -v gc)"
 
 If `$ZSH_CUSTOM` is empty, append the line to the bottom of `~/.zshrc` instead. It has to come after `source "$ZSH/oh-my-zsh.sh"` or the plugin recreates the alias.
 
+To get past the alias for a single command without changing any files, run `command gc version`. The [installation guide](https://docs.gascity.com/getting-started/installation) lists this too.
+
 ## 3. Set your Dolt identity
 
 Gas City stores beads in Dolt, and Dolt refuses to initialize without an author. Without this step, `gc init` creates the city and then stops with "startup is blocked by Dolt author identity".
@@ -234,6 +236,9 @@ brew untap gastownhall/gascity
 | `applying rig patches: ... agent "claude" not found in pack` | A `[[rigs.patches]]` block aimed at an implicit agent | Use a city-level `[[patches.agent]]` with `dir` and `name` (step 7) |
 | `unknown flag` for a flag the docs mention | The docs are ahead of your installed version | `gc <command> --help` |
 | `dolt circuit breaker is open: server appears down` | Dolt stopped answering for a moment | Wait a minute, then `gc beads health` from `~/city` |
+| A hello world job takes about 20 minutes and costs several dollars | The worker runs Opus at `--effort max` with your `~/.claude` rules, skills and Git identity | Step 7: patch the agent and give it its own `CLAUDE_CONFIG_DIR` |
+| A running worker stalls, and its `gc bd` calls fail | `city.toml` no longer loads | `gc config show --validate`, fix what it reports, then check the worker with `gc session peek` |
+| A worker's job breaks after you switched branches or committed in the rig | The default worker has no worktree. It checks out its bead's branch in the rig itself | Leave the rig checkout alone while a worker has it. Follow the worker with `gc session peek` |
 | `gc hook: agent not specified` | Running a worker's command in your own shell | Don't. Use `gc session peek` to follow the worker |
 | `zsh: no such file or directory` on a `bd show` line | A literal `<bead-id>` placeholder was pasted, and zsh read `<` as a redirect | Replace it with the real ID from `sling` |
 
