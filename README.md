@@ -1,5 +1,7 @@
 # Gas City runbook
 
+This runbook was built by [Claude](https://claude.ai/share/e42d826f-a952-4481-aa63-0ac17068060b).
+
 Operating notes for [Gas City](https://gascity.com/) ([source](https://github.com/gastownhall/gascity)), the orchestrator that routes beads of work to coding-agent sessions running in your Git repos. These notes take a Mac from nothing to a city with a tuned Claude Code worker, then cover routing, watching and merging its jobs, and adding a real project as a rig.
 
 Written against **Gas City 1.4.2** and **bd 1.3.0** on macOS, from a first install and a first real rig (coderay). Steps say what they printed on that build. The gascity docs track `main`, which runs ahead of the Homebrew release, so re-check after `brew upgrade gascity`.
