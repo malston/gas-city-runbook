@@ -189,19 +189,19 @@ When this was written it printed `supervisor: no key`, even though `launchctl ge
 Follow "Give workers their own Claude config" in [SETUP.md](../SETUP.md) step 7, running the one-time `claude` command in this rig:
 
 ```bash
-mkdir -p ~/.claude-gc-worker
+mkdir -p ~/.claude-gc
 cd ~/gc-rigs/coderay
-CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions
+CLAUDE_CONFIG_DIR=~/.claude-gc claude --dangerously-skip-permissions
 ```
 
 Answer every prompt, including _Yes, I trust this folder_, then `/exit`. Check that the answers were saved:
 
 ```bash
 python3 -c "
-import json; d = json.load(open('$HOME/.claude-gc-worker/.claude.json'))
+import json; d = json.load(open('$HOME/.claude-gc/.claude.json'))
 print('trusted:', d['projects']['$HOME/gc-rigs/coderay'].get('hasTrustDialogAccepted'))
 print('logged in:', bool(d.get('oauthAccount')))"
-cat ~/.claude-gc-worker/settings.json
+cat ~/.claude-gc/settings.json
 ```
 
 Expect `trusted: True`, `logged in: True`, and `"skipDangerousModePermissionPrompt": true` in `settings.json`.
@@ -209,14 +209,14 @@ Expect `trusted: True`, `logged in: True`, and `"skipDangerousModePermissionProm
 Then add `CLAUDE_CONFIG_DIR` to the front of the coderay patch's `env`:
 
 ```toml
-env = { CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc-worker", GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
+env = { CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc", GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
 ```
 
 If `city.toml` has no `[daemon]` table yet, add one near the top, after `[workspace]`:
 
 ```toml
 [daemon]
-observe_paths = ["/Users/markalston/.claude-gc-worker/projects"]
+observe_paths = ["/Users/markalston/.claude-gc/projects"]
 ```
 
 Validate again with `gc config show --validate`, and rerun the `awk` check from step 7. It should now also show `CLAUDE_CONFIG_DIR`.
@@ -229,7 +229,7 @@ coderay's own `CLAUDE.md` and `.claude/settings.json` come with the clone, so wo
 
 coderay's `CLAUDE.md` gives `pip install -e .` as the raw install command. On the first job the worker ran exactly that in the clone. Plain `pip` on its `PATH` was the shared mise Python 3.14.2, not the clone's `.venv`. That interpreter already had an editable `crawl` pointing at `~/code/coderay`, and the worker's install switched it to `~/gc-rigs/coderay`. A Claude session in `~/code/coderay` running plain `pytest` then tested the clone's code. Only `make` and `uv run` use the clone's `.venv`.
 
-Give workers a rule of their own in `~/.claude-gc-worker/CLAUDE.md`:
+Give workers a rule of their own in `~/.claude-gc/CLAUDE.md`:
 
 ```markdown
 # Gas City worker rules
@@ -246,7 +246,7 @@ Check that the worker config loads it (one Haiku call):
 
 ```bash
 cd ~/gc-rigs/coderay
-CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude -p --model haiku "Without running any tools: what does your user-level instructions file say about pip? Quote its first bullet exactly."
+CLAUDE_CONFIG_DIR=~/.claude-gc claude -p --model haiku "Without running any tools: what does your user-level instructions file say about pip? Quote its first bullet exactly."
 ```
 
 It should quote the first bullet. This is an instruction, not a lock, so a worker can still ignore it. To see whether it did, check which checkout the shared install points at:

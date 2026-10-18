@@ -169,14 +169,14 @@ Gas City's own pieces don't live in that directory, so they keep working. In 1.4
 Create the directory and set it up once by hand. A fresh Claude config has none of the answers a worker can't give on its own, and each unanswered prompt kills the session the same way the trust prompt did in step 5.
 
 ```bash
-mkdir -p ~/.claude-gc-worker
+mkdir -p ~/.claude-gc
 cd ~/scratch
-CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions
+CLAUDE_CONFIG_DIR=~/.claude-gc claude --dangerously-skip-permissions
 ```
 
 Answer everything it asks, which on a fresh directory can include a theme choice, a login, the folder trust prompt and a warning about bypass permissions mode. Log in with the same account you use now. Then type `/exit`. For every rig you add later, run the same `claude` command once in that rig so the new config trusts it too.
 
-If you want workers to follow a few rules of their own, put a short `CLAUDE.md` in `~/.claude-gc-worker`. Keep it small. It applies to every worker that uses this directory. A lean claudeup profile is another way to manage what goes in there.
+If you want workers to follow a few rules of their own, put a short `CLAUDE.md` in `~/.claude-gc`. Keep it small. It applies to every worker that uses this directory. A lean claudeup profile is another way to manage what goes in there.
 
 Add the directory to the agent patch's `env`. Use the full path, since Gas City passes the value as written and `~` won't expand:
 
@@ -185,19 +185,19 @@ Add the directory to the agent patch's `env`. Use the full path, since Gas City 
 dir = "scratch"
 name = "claude"
 option_defaults = { effort = "medium", model = "sonnet" }
-env = { CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc-worker", GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
+env = { CLAUDE_CONFIG_DIR = "/Users/markalston/.claude-gc", GIT_AUTHOR_NAME = "Gas City worker", GIT_AUTHOR_EMAIL = "gc-worker@localhost", GIT_COMMITTER_NAME = "Gas City worker", GIT_COMMITTER_EMAIL = "gc-worker@localhost" }
 ```
 
 Claude Code also writes session transcripts under the config directory, and `gc session logs` only looks in `~/.claude/projects/` by default. Add the new location near the top of `city.toml` so `gc session logs` still finds worker transcripts:
 
 ```toml
 [daemon]
-observe_paths = ["/Users/markalston/.claude-gc-worker/projects"]
+observe_paths = ["/Users/markalston/.claude-gc/projects"]
 ```
 
 Validate again with `gc config show --validate`. The change applies to the next worker session, not one that's already running.
 
-The quickest check is `gc session peek` on the next worker. The status area at the bottom should no longer show your personal status lines (the token-ledger, context-lens and quota-meter lines). `ls ~/.claude-gc-worker/projects` should also gain an entry for the rig once the worker has run. If the session loops in `start-pending` instead, check `start-stderr.log` as in the troubleshooting table. The most likely cause is a first-run prompt the manual setup didn't answer.
+The quickest check is `gc session peek` on the next worker. The status area at the bottom should no longer show your personal status lines (the token-ledger, context-lens and quota-meter lines). `ls ~/.claude-gc/projects` should also gain an entry for the rig once the worker has run. If the session loops in `start-pending` instead, check `start-stderr.log` as in the troubleshooting table. The most likely cause is a first-run prompt the manual setup didn't answer.
 
 When step 7 validates, route the first job with [recipe 1](recipes/01-first-job.md).
 
@@ -231,7 +231,7 @@ brew untap gastownhall/gascity
 | `bd show` says `no issue found` for an `sc-` bead | Looking in the city store instead of the rig's | `gc bd --rig scratch show <id>` |
 | A rig session sits in `start-pending` or `creating`, and `gc session list` shows a new ID every few seconds | The session dies on startup and the pool keeps replacing it | Run `gc supervisor logs` and look for `session died during startup`. The `last pane output` shows what Claude printed, and the full text is in `~/city/.gc/sessions/<session>/start-stderr.log` |
 | That log shows "Quick safety check: Is this a project you created or one you trust?" | Claude Code hasn't been told to trust the rig folder | Run `claude` once in the rig directory, choose _Yes, I trust this folder_, then `/exit` |
-| Workers loop again right after adding `CLAUDE_CONFIG_DIR` | The new config directory hasn't answered a first-run prompt (login, trust or the bypass-permissions warning) for this rig | Run `CLAUDE_CONFIG_DIR=~/.claude-gc-worker claude --dangerously-skip-permissions` in the rig, answer the prompts, then `/exit` |
+| Workers loop again right after adding `CLAUDE_CONFIG_DIR` | The new config directory hasn't answered a first-run prompt (login, trust or the bypass-permissions warning) for this rig | Run `CLAUDE_CONFIG_DIR=~/.claude-gc claude --dangerously-skip-permissions` in the rig, answer the prompts, then `/exit` |
 | `gc session logs` finds nothing for a worker | Its transcripts are under the worker config directory | Add `<dir>/projects` to `[daemon] observe_paths` |
 | `applying rig patches: ... agent "claude" not found in pack` | A `[[rigs.patches]]` block aimed at an implicit agent | Use a city-level `[[patches.agent]]` with `dir` and `name` (step 7) |
 | `unknown flag` for a flag the docs mention | The docs are ahead of your installed version | `gc <command> --help` |
